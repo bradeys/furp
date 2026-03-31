@@ -1,0 +1,67 @@
+@page "/pets"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject FurpictApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>My Pets — Furpict</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">My Pets</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               Href="/pets/new">
+        Add a Pet
+    </MudButton>
+</div>
+
+@if (_loading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_pets is null || _pets.Count == 0)
+{
+    <MudPaper Class="pa-8 text-center" Elevation="0" Outlined="true">
+        <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+        <MudText Typo="Typo.h6" Class="mb-2">No pets yet</MudText>
+        <MudText Class="mb-4" Color="Color.Secondary">Add your first pet to start building an AI model!</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/pets/new">Add a Pet</MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var pet in _pets)
+        {
+            var capturedPet = pet;
+            <MudItem xs="12" sm="6" md="4">
+                <PetCard Pet="capturedPet" OnClick="() => NavigateToPet(capturedPet.Id)" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<PetDetailResponse>? _pets;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var petSummaries = await Api.GetPetsAsync();
+            if (petSummaries is not null)
+            {
+                var tasks = petSummaries.Select(p => Api.GetPetAsync(p.Id)).ToList();
+                var results = await Task.WhenAll(tasks);
+                _pets = results.Where(r => r is not null).Cast<PetDetailResponse>().ToList();
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void NavigateToPet(Guid id) => Nav.NavigateTo("/pets/" + id);
+}

@@ -1,0 +1,23 @@
+@using Furpict.Client.Models
+
+<MudCard Class="pet-card" Elevation="2" Style="cursor:pointer" @onclick="OnClick">
+    <MudCardContent>
+        <div class="d-flex align-center gap-3 mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Pets" Color="Color.Primary" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h6">@Pet.Name</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @Pet.Species@(Pet.Breed is not null ? $" · {Pet.Breed}" : "")
+                </MudText>
+            </div>
+        </div>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            @Pet.Models.Count model@(Pet.Models.Count != 1 ? "s" : "")
+        </MudText>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public PetDetailResponse Pet { get; set; } = null!;
+    [Parameter] public EventCallback OnClick { get; set; }
+}

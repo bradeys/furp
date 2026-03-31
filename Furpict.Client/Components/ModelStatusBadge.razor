@@ -1,0 +1,32 @@
+@using Furpict.Client.Models
+
+<MudChip T="string"
+         Color="@GetColor()"
+         Size="Size.Small"
+         Icon="@GetIcon()">
+    @Status
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = string.Empty;
+
+    private Color GetColor() => Status switch
+    {
+        "Ready" => Color.Success,
+        "Training" => Color.Info,
+        "Uploading" => Color.Warning,
+        "Paid" => Color.Secondary,
+        "Failed" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetIcon() => Status switch
+    {
+        "Ready" => Icons.Material.Filled.CheckCircle,
+        "Training" => Icons.Material.Filled.Autorenew,
+        "Uploading" => Icons.Material.Filled.CloudUpload,
+        "Paid" => Icons.Material.Filled.Payment,
+        "Failed" => Icons.Material.Filled.Error,
+        _ => Icons.Material.Filled.HourglassEmpty
+    };
+}

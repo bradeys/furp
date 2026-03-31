@@ -1,0 +1,131 @@
+@page "/gallery"
+@inject FurpictApiClient Api
+
+<PageTitle>Gallery — Furpict</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Image Gallery</MudText>
+
+<AuthorizeView>
+    <Authorized>
+        <MudTabs Elevation="1" Rounded="true" Class="mb-4" @bind-ActivePanelIndex="_activeTab">
+            <MudTabPanel Text="Featured">
+                <div class="mt-4">
+                    @if (_featuredLoading)
+                    {
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                    }
+                    else if (_featured.Count == 0)
+                    {
+                        <MudText Color="Color.Secondary">No featured images yet. Check back soon!</MudText>
+                    }
+                    else
+                    {
+                        <MudGrid Spacing="2">
+                            @foreach (var image in _featured)
+                            {
+                                <MudItem xs="12" sm="6" md="4" lg="3">
+                                    <FeaturedImageCard Image="@image" />
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+                </div>
+            </MudTabPanel>
+            <MudTabPanel Text="Community">
+                <div class="mt-4">
+                    @if (_communityLoading)
+                    {
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                    }
+                    else if (_community.Count == 0)
+                    {
+                        <MudText Color="Color.Secondary">No community images yet. Be the first!</MudText>
+                    }
+                    else
+                    {
+                        <MudGrid Spacing="2">
+                            @foreach (var image in _community)
+                            {
+                                <MudItem xs="12" sm="6" md="4" lg="3">
+                                    <FeaturedImageCard Image="@image" />
+                                </MudItem>
+                            }
+                        </MudGrid>
+                        <div class="d-flex justify-center mt-4">
+                            <MudButton Variant="Variant.Outlined"
+                                       Disabled="@_communityLoading"
+                                       OnClick="LoadMoreCommunityAsync">
+                                Load More
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+            </MudTabPanel>
+        </MudTabs>
+    </Authorized>
+    <NotAuthorized>
+        <MudText Class="mb-4" Color="Color.Secondary">
+            Featured community creations. Sign in to browse the full gallery.
+        </MudText>
+        @if (_featuredLoading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                @foreach (var image in _featured)
+                {
+                    <MudItem xs="12" sm="6" md="4" lg="3">
+                        <FeaturedImageCard Image="@image" />
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        <MudPaper Class="pa-6 text-center mt-6" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-2">Want to see more?</MudText>
+            <MudText Color="Color.Secondary" Class="mb-4">Create a free account to browse the full community gallery and build your own AI pet model.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/Account/Register">Sign Up Free</MudButton>
+        </MudPaper>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private int _activeTab;
+    private List<GalleryImageResponse> _featured = [];
+    private List<GalleryImageResponse> _community = [];
+    private bool _featuredLoading = true;
+    private bool _communityLoading;
+    private int _communityPage = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var featured = await Api.GetFeaturedImagesAsync();
+        _featured = featured ?? [];
+        _featuredLoading = false;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_activeTab == 1 && _community.Count == 0)
+            await LoadMoreCommunityAsync();
+    }
+
+    private async Task LoadMoreCommunityAsync()
+    {
+        _communityLoading = true;
+        try
+        {
+            var more = await Api.GetGalleryImagesAsync(_communityPage);
+            if (more is not null)
+            {
+                _community.AddRange(more);
+                _communityPage++;
+            }
+        }
+        finally
+        {
+            _communityLoading = false;
+        }
+    }
+}

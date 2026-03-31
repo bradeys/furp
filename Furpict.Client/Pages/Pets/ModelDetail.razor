@@ -1,0 +1,210 @@
+@page "/pets/{petId:guid}/models/{modelId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@using System.Timers
+@attribute [Authorize]
+@implements IDisposable
+@inject FurpictApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Model — Furpict</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_status is null)
+{
+    <MudAlert Severity="Severity.Error">Model not found.</MudAlert>
+}
+else
+{
+    <div class="d-flex align-center gap-3 mb-4">
+        <MudText Typo="Typo.h4">AI Model</MudText>
+        <ModelStatusBadge Status="@_status.Status" />
+    </div>
+
+    @switch (_status.Status)
+    {
+        case "Pending":
+            <MudAlert Severity="Severity.Info">
+                This model is waiting for payment. Please complete your purchase to begin training.
+            </MudAlert>
+            break;
+
+        case "Paid":
+        case "Uploading":
+            <MudAlert Severity="Severity.Info">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                Uploading training photos...
+            </MudAlert>
+            break;
+
+        case "Training":
+            <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true">
+                <MudProgressCircular Color="Color.Info" Indeterminate="true" Size="Size.Large" Class="mb-4" />
+                <MudText Typo="Typo.h6" Class="mb-2">Training in progress</MudText>
+                <MudText Color="Color.Secondary">
+                    Your AI model is being trained. This typically takes 20–60 minutes.
+                    This page will automatically update when it's ready.
+                </MudText>
+                @if (_status.TrainingStartedAt.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                        Started: @_status.TrainingStartedAt.Value.LocalDateTime.ToString("MMM d, yyyy h:mm tt")
+                    </MudText>
+                }
+            </MudPaper>
+            break;
+
+        case "Ready":
+            <MudText Class="mb-4" Color="Color.Secondary">
+                Your model is ready! Enter a prompt to generate a custom image of your pet.
+            </MudText>
+
+            <MudPaper Class="pa-4 mb-6" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-3">Generate an Image</MudText>
+                <div class="d-flex gap-2 align-center">
+                    <MudTextField @bind-Value="_prompt"
+                                  Placeholder="e.g. My dog surfing at the beach"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.None"
+                                  FullWidth="true"
+                                  MaxLength="500"
+                                  Disabled="@_generating" />
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.AutoAwesome"
+                               Disabled="@(string.IsNullOrWhiteSpace(_prompt) || _generating)"
+                               OnClick="GenerateAsync">
+                        @if (_generating)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <span>Generate</span>
+                        }
+                    </MudButton>
+                </div>
+                @if (_generateError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-2">@_generateError</MudAlert>
+                }
+            </MudPaper>
+
+            @if (_images.Count > 0)
+            {
+                <MudText Typo="Typo.h6" Class="mb-3">Your Generated Images</MudText>
+                <MudGrid Spacing="2">
+                    @foreach (var image in _images)
+                    {
+                        <MudItem xs="12" sm="6" md="4" lg="3">
+                            <MudCard Elevation="2">
+                                <MudCardMedia Image="@image.ImageUrl" Height="220" Alt="@image.Prompt" Style="object-fit:cover" />
+                                <MudCardContent Class="pa-2">
+                                    <MudText Typo="Typo.caption">@image.Prompt</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+            break;
+
+        case "Failed":
+            <MudAlert Severity="Severity.Error">
+                Training failed. @(_status.FailureReason ?? "Please contact support.")
+            </MudAlert>
+            break;
+    }
+}
+
+@code {
+    [Parameter] public Guid PetId { get; set; }
+    [Parameter] public Guid ModelId { get; set; }
+
+    private ModelStatusResponse? _status;
+    private bool _loading = true;
+    private string _prompt = string.Empty;
+    private bool _generating;
+    private string? _generateError;
+    private List<GeneratedImageResponse> _images = [];
+    private Timer? _pollTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshStatusAsync();
+        _loading = false;
+
+        if (_status?.Status is "Training" or "Uploading" or "Paid")
+            StartPolling();
+
+        if (_status?.Status == "Ready")
+            await LoadImagesAsync();
+    }
+
+    private void StartPolling()
+    {
+        _pollTimer = new Timer(30_000);
+        _pollTimer.Elapsed += async (_, _) => await InvokeAsync(async () =>
+        {
+            await RefreshStatusAsync();
+
+            if (_status?.Status is not ("Training" or "Uploading" or "Paid"))
+            {
+                StopPolling();
+                if (_status?.Status == "Ready")
+                    await LoadImagesAsync();
+            }
+
+            StateHasChanged();
+        });
+        _pollTimer.Start();
+    }
+
+    private void StopPolling()
+    {
+        _pollTimer?.Stop();
+        _pollTimer?.Dispose();
+        _pollTimer = null;
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        try { _status = await Api.GetModelStatusAsync(PetId, ModelId); }
+        catch { /* swallow during polling */ }
+    }
+
+    private async Task LoadImagesAsync()
+    {
+        var images = await Api.GetGeneratedImagesAsync(ModelId);
+        _images = images ?? [];
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_prompt)) return;
+
+        _generating = true;
+        _generateError = null;
+        try
+        {
+            var result = await Api.GenerateImageAsync(ModelId, _prompt);
+            if (result is not null)
+            {
+                _images.Insert(0, result);
+                _prompt = string.Empty;
+            }
+        }
+        catch (Exception)
+        {
+            _generateError = "Image generation failed. Please try again.";
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+
+    public void Dispose() => StopPolling();
+}

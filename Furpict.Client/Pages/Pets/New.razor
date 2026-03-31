@@ -1,0 +1,90 @@
+@page "/pets/new"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject FurpictApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Add a Pet — Furpict</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Add a New Pet</MudText>
+
+<MudPaper Class="pa-6" MaxWidth="480px" Elevation="2">
+    <MudForm @ref="_form" @bind-IsValid="_isValid">
+        <MudTextField @bind-Value="_name"
+                      Label="Pet's Name"
+                      Required="true"
+                      RequiredError="Name is required"
+                      MaxLength="100"
+                      Class="mb-3" />
+
+        <MudSelect @bind-Value="_species"
+                   Label="Species"
+                   Required="true"
+                   RequiredError="Please select a species"
+                   Class="mb-3">
+            <MudSelectItem Value='"Dog"'>🐕 Dog</MudSelectItem>
+            <MudSelectItem Value='"Cat"'>🐈 Cat</MudSelectItem>
+            <MudSelectItem Value='"Bird"'>🐦 Bird</MudSelectItem>
+            <MudSelectItem Value='"Rabbit"'>🐰 Rabbit</MudSelectItem>
+            <MudSelectItem Value='"Hamster"'>🐹 Hamster</MudSelectItem>
+            <MudSelectItem Value='"Other"'>Other</MudSelectItem>
+        </MudSelect>
+
+        <MudTextField @bind-Value="_breed"
+                      Label="Breed (optional)"
+                      MaxLength="100"
+                      Class="mb-6" />
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3">@_error</MudAlert>
+        }
+
+        <div class="d-flex gap-3">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="SubmitAsync"
+                       Disabled="@_saving">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Add Pet
+            </MudButton>
+            <MudButton Variant="Variant.Text" Href="/pets">Cancel</MudButton>
+        </div>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm _form = null!;
+    private bool _isValid;
+    private string _name = string.Empty;
+    private string _species = string.Empty;
+    private string? _breed;
+    private bool _saving;
+    private string? _error;
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid) return;
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var pet = await Api.CreatePetAsync(_name, _species, _breed?.Trim().NullIfEmpty());
+            if (pet is not null)
+                Nav.NavigateTo($"/pets/{pet.Id}");
+        }
+        catch (Exception)
+        {
+            _error = "Failed to create pet. Please try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

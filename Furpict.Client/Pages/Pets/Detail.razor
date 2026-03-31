@@ -1,0 +1,94 @@
+@page "/pets/{petId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject FurpictApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(_pet?.Name ?? "Pet") — Furpict</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_pet is null)
+{
+    <MudAlert Severity="Severity.Error">Pet not found.</MudAlert>
+}
+else
+{
+    <div class="d-flex align-center gap-3 mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Pets" Color="Color.Primary" Size="Size.Large" />
+        <div>
+            <MudText Typo="Typo.h4">@_pet.Name</MudText>
+            <MudText Color="Color.Secondary">
+                @_pet.Species@(_pet.Breed is not null ? " · " + _pet.Breed : "")
+            </MudText>
+        </div>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AutoAwesome"
+                   Href="@("/pets/" + PetId + "/models/new")">
+            Create AI Model
+        </MudButton>
+    </div>
+
+    @if (_pet.Models.Count == 0)
+    {
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+            <MudText Typo="Typo.h6" Class="mb-2">No AI models yet</MudText>
+            <MudText Color="Color.Secondary" Class="mb-4">
+                Create your first AI model by uploading 10 photos of @_pet.Name.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@("/pets/" + PetId + "/models/new")">
+                Get Started
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudText Typo="Typo.h6" Class="mb-3">AI Models</MudText>
+        <MudGrid Spacing="2">
+            @foreach (var model in _pet.Models.OrderByDescending(m => m.CreatedAt))
+            {
+                var capturedModel = model;
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="2" Style="cursor:pointer"
+                             @onclick="() => NavigateToModel(capturedModel.Id)">
+                        <MudCardContent>
+                            <div class="d-flex justify-space-between align-center mb-2">
+                                <ModelStatusBadge Status="@capturedModel.Status" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @capturedModel.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")
+                                </MudText>
+                            </div>
+                            @if (capturedModel.CompletedAt.HasValue)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Completed @capturedModel.CompletedAt.Value.LocalDateTime.ToString("MMM d, yyyy")
+                                </MudText>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+
+@code {
+    [Parameter] public Guid PetId { get; set; }
+
+    private PetDetailResponse? _pet;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _pet = await Api.GetPetAsync(PetId); }
+        finally { _loading = false; }
+    }
+
+    private void NavigateToModel(Guid modelId) =>
+        Nav.NavigateTo("/pets/" + PetId + "/models/" + modelId);
+}

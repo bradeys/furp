@@ -1,0 +1,90 @@
+@page "/"
+@inject FurpictApiClient Api
+
+<PageTitle>Furpict — AI Pet Image Models</PageTitle>
+
+<div class="hero-section mb-8">
+    <MudText Typo="Typo.h2" GutterBottom="true">
+        Turn Your Pet Into an AI Model
+    </MudText>
+    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6">
+        Upload 10 photos. We'll train a personalized AI model of your pet.
+        Then generate stunning images of them in any scene you can imagine.
+    </MudText>
+    <div class="d-flex gap-3 flex-wrap">
+        <AuthorizeView>
+            <Authorized>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Pets" Href="/pets">
+                    My Pets
+                </MudButton>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Pets" Href="/Account/Register">
+                    Get Started
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Large"
+                           Href="/gallery">
+                    View Gallery
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</div>
+
+<MudDivider Class="mb-6" />
+
+<MudText Typo="Typo.h5" GutterBottom="true">How It Works</MudText>
+<MudGrid Spacing="4" Class="mb-8">
+    <MudItem xs="12" sm="4">
+        <div class="text-center">
+            <MudIcon Icon="@Icons.Material.Filled.AddAPhoto" Color="Color.Primary" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h6">1. Upload 10 Photos</MudText>
+            <MudText Color="Color.Secondary">Capture your pet from all angles — front, sides, face, top, and more.</MudText>
+        </div>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <div class="text-center">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Secondary" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h6">2. AI Training</MudText>
+            <MudText Color="Color.Secondary">Our AI learns exactly what your pet looks like. Training takes 20–60 minutes.</MudText>
+        </div>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <div class="text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PhotoLibrary" Color="Color.Success" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.h6">3. Generate Images</MudText>
+            <MudText Color="Color.Secondary">Type any prompt and watch your pet appear in the scene. Surfing, flying, driving — anything!</MudText>
+        </div>
+    </MudItem>
+</MudGrid>
+
+@if (_featured.Count > 0)
+{
+    <MudDivider Class="mb-6" />
+    <div class="d-flex align-center justify-space-between mb-4">
+        <MudText Typo="Typo.h5">Featured Creations</MudText>
+        <MudButton Variant="Variant.Text" Href="/gallery" EndIcon="@Icons.Material.Filled.ArrowForward">
+            View Gallery
+        </MudButton>
+    </div>
+    <MudGrid Spacing="2">
+        @foreach (var image in _featured.Take(8))
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <FeaturedImageCard Image="@image" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<GalleryImageResponse> _featured = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetFeaturedImagesAsync();
+        _featured = result ?? [];
+    }
+}

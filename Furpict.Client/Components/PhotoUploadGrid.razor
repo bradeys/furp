@@ -1,0 +1,131 @@
+@using System.IO.Compression
+
+@inject IJSRuntime JS
+
+<MudText Typo="Typo.h6" GutterBottom="true">Upload 10 Photos of Your Pet</MudText>
+<MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
+    We need photos from different angles so the AI can learn your pet's appearance.
+    Max 10MB per photo, JPEG or PNG only.
+</MudText>
+
+<MudGrid Spacing="2">
+    @foreach (var slot in _slots)
+    {
+        <MudItem xs="6" sm="4" md="3" lg="2">
+            <div class="upload-slot @(slot.File is not null ? "has-file" : "")"
+                 @onclick="() => TriggerFileInput(slot)">
+                @if (slot.PreviewUrl is not null)
+                {
+                    <img src="@slot.PreviewUrl" alt="@slot.Label" class="slot-preview" />
+                    <div class="slot-overlay">
+                        <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Surface" />
+                    </div>
+                }
+                else
+                {
+                    <div class="slot-empty">
+                        <MudIcon Icon="@Icons.Material.Filled.AddAPhoto" Color="Color.Secondary" Size="Size.Large" />
+                    </div>
+                }
+                <div class="slot-label">
+                    <MudText Typo="Typo.caption">@slot.Label</MudText>
+                    @if (slot.File is not null)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                    }
+                </div>
+            </div>
+            <InputFile id="@slot.InputId" OnChange="e => OnFileSelected(e, slot)"
+                       accept="image/jpeg,image/png" style="display:none" />
+        </MudItem>
+    }
+</MudGrid>
+
+@if (_validationError is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mt-3">@_validationError</MudAlert>
+}
+
+<MudText Typo="Typo.body2" Class="mt-3">
+    <b>@FilledCount / @_slots.Length</b> photos uploaded
+</MudText>
+
+@code {
+    [Parameter] public EventCallback<byte[]> OnZipReady { get; set; }
+
+    private string? _validationError;
+
+    private readonly PhotoSlot[] _slots =
+    [
+        new("Front",         "slot-front"),
+        new("Back",          "slot-back"),
+        new("Left Side",     "slot-left"),
+        new("Right Side",    "slot-right"),
+        new("Face",          "slot-face"),
+        new("Left Profile",  "slot-left-profile"),
+        new("Right Profile", "slot-right-profile"),
+        new("Top / Above",   "slot-top"),
+        new("Close-up",      "slot-closeup"),
+        new("Full Body",     "slot-fullbody")
+    ];
+
+    public int FilledCount => _slots.Count(s => s.File is not null);
+    public bool IsComplete => FilledCount == _slots.Length;
+
+    private async Task TriggerFileInput(PhotoSlot slot)
+    {
+        await JS.InvokeVoidAsync("eval", $"document.getElementById('{slot.InputId}').click()");
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e, PhotoSlot slot)
+    {
+        _validationError = null;
+        var file = e.File;
+
+        if (file.Size > 10 * 1024 * 1024)
+        {
+            _validationError = $"'{file.Name}' exceeds the 10MB limit.";
+            return;
+        }
+
+        if (!file.ContentType.StartsWith("image/"))
+        {
+            _validationError = $"'{file.Name}' must be a JPEG or PNG image.";
+            return;
+        }
+
+        using var ms = new MemoryStream();
+        await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+        await stream.CopyToAsync(ms);
+        slot.FileBytes = ms.ToArray();
+        slot.File = file;
+        slot.PreviewUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+
+        StateHasChanged();
+    }
+
+    public async Task<byte[]> BuildZipAsync()
+    {
+        using var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var slot in _slots.Where(s => s.FileBytes is not null))
+            {
+                var ext = slot.File!.ContentType == "image/png" ? "png" : "jpg";
+                var entry = zip.CreateEntry($"{slot.Label.Replace(" ", "_").Replace("/", "-")}.{ext}");
+                await using var entryStream = entry.Open();
+                await entryStream.WriteAsync(slot.FileBytes);
+            }
+        }
+        return ms.ToArray();
+    }
+
+    private sealed class PhotoSlot(string label, string inputId)
+    {
+        public string Label { get; } = label;
+        public string InputId { get; } = inputId;
+        public IBrowserFile? File { get; set; }
+        public byte[]? FileBytes { get; set; }
+        public string? PreviewUrl { get; set; }
+    }
+}

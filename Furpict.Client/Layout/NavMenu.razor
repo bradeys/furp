@@ -1,0 +1,9 @@
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="gallery" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PhotoLibrary">Gallery</MudNavLink>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="pets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Pets">My Pets</MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

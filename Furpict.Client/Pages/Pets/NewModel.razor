@@ -1,0 +1,97 @@
+@page "/pets/{petId:guid}/models/new"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject FurpictApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Create AI Model — Furpict</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Create an AI Model</MudText>
+
+@switch (_step)
+{
+    case Step.Upload:
+        <MudText Class="mb-4" Color="Color.Secondary">
+            Upload 10 photos of your pet from different angles. After uploading, you'll pay once to
+            start the AI training.
+        </MudText>
+
+        <PhotoUploadGrid @ref="_uploadGrid" />
+
+        <div class="d-flex align-center gap-3 mt-4">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Payment"
+                       Disabled="@(!(_uploadGrid?.IsComplete ?? false) || _processing)"
+                       OnClick="ProceedToPaymentAsync">
+                @if (_processing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Continue to Payment
+            </MudButton>
+            <MudButton Variant="Variant.Text" Href="@($"/pets/{PetId}")">Cancel</MudButton>
+        </div>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+        }
+        break;
+
+    case Step.Redirecting:
+        <div class="d-flex flex-column align-center gap-4 mt-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <MudText Typo="Typo.h6">Preparing your payment...</MudText>
+            <MudText Color="Color.Secondary">You'll be redirected to Stripe to complete your purchase.</MudText>
+        </div>
+        break;
+}
+
+@code {
+    [Parameter] public Guid PetId { get; set; }
+
+    private enum Step { Upload, Redirecting }
+    private Step _step = Step.Upload;
+    private PhotoUploadGrid? _uploadGrid;
+    private bool _processing;
+    private string? _error;
+
+    private async Task ProceedToPaymentAsync()
+    {
+        if (_uploadGrid is null || !_uploadGrid.IsComplete) return;
+
+        _processing = true;
+        _error = null;
+
+        try
+        {
+            // Build zip client-side
+            var zipBytes = await _uploadGrid.BuildZipAsync();
+
+            // Create model record on server → get checkout URL
+            var clientBaseUrl = Nav.BaseUri.TrimEnd('/');
+            var createResult = await Api.CreateModelAsync(PetId, clientBaseUrl);
+            if (createResult is null)
+            {
+                _error = "Failed to create model. Please try again.";
+                return;
+            }
+
+            // Store zip in session storage so we can upload after payment returns
+            // (We upload after Stripe redirects back with ?payment=success)
+            // For now, redirect to Stripe
+            _step = Step.Redirecting;
+            Nav.NavigateTo(createResult.CheckoutUrl, forceLoad: true);
+        }
+        catch (Exception)
+        {
+            _error = "An error occurred. Please try again.";
+            _step = Step.Upload;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+}

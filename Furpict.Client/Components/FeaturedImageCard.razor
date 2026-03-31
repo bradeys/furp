@@ -1,0 +1,16 @@
+@using Furpict.Client.Models
+
+<MudCard Elevation="2" Class="gallery-image-card">
+    <MudCardMedia Image="@Image.ImageUrl" Height="220" Alt="@Image.Prompt" Style="object-fit:cover" />
+    <MudCardContent Class="pa-2">
+        <MudText Typo="Typo.caption" Class="prompt-text">@TruncatedPrompt</MudText>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public GalleryImageResponse Image { get; set; } = null!;
+
+    private string TruncatedPrompt => Image.Prompt.Length > 80
+        ? Image.Prompt[..77] + "..."
+        : Image.Prompt;
+}
