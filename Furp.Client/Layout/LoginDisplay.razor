@@ -1,0 +1,24 @@
+@using Furp.Client.Authentication
+@inject ClientAuthenticationNavigator AuthenticationNavigator
+
+<AuthorizeView>
+    <Authorized>
+        <MudText Typo="Typo.body2" Class="d-inline mr-2">Hello, @context.User.Identity?.Name!</MudText>
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="BeginLogOut">Log out</MudButton>
+    </Authorized>
+    <NotAuthorized>
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="BeginLogIn">Log in</MudButton>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code{
+    public void BeginLogIn()
+    {
+        AuthenticationNavigator.NavigateToLogin();
+    }
+
+    public void BeginLogOut()
+    {
+        AuthenticationNavigator.NavigateToLogout();
+    }
+}
